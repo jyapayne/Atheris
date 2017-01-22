@@ -1,0 +1,6 @@
+def stuff(vars: int): string =
+    let x: float = 3.4
+    var
+      t: int = 4
+      junk: ClassName = ClassName()
+
