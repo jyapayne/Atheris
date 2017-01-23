@@ -32,6 +32,12 @@ class TokenType(Enum):
     QUOTE = 21
     DB_QUOTE = 22
 
+    COMMENT = 23
+    AND = 24
+    OR = 25
+    NOT = 26
+    IS = 27
+
 
 class Token(object):
 
@@ -46,6 +52,10 @@ class Token(object):
         'char': TokenType.CHAR,
         'for': TokenType.FOR,
         'in': TokenType.IN,
+        'and': TokenType.AND,
+        'or': TokenType.OR,
+        'not': TokenType.NOT,
+        'is': TokenType.IS,
         '(': TokenType.LEFT_BRACKET,
         ')': TokenType.RIGHT_BRACKET,
         '=': TokenType.EQUALS,
@@ -61,7 +71,10 @@ class Token(object):
         self.line = line
         self.col = col
 
-    def __str__(self):
+    def __repr__(self):
         return ('Token(type: {}, content: {}, '
                 'line: {}, col: {})'.format(self.token_type, self.content,
                                             self.line, self.col))
+
+    def __str__(self):
+        return self.__repr__()
