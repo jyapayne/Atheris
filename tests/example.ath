@@ -3,4 +3,4 @@ def stuff(vars: int): string =
     var
       t: int = 4
       junk: ClassName = ClassName()
-
+    a and b or c not d and e is f
