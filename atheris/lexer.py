@@ -36,20 +36,16 @@ class Lexer(object):
     def fill_buffer(self):
         self.line_buf = self.scanner.readline().rstrip('\n').rstrip('\r\n')
 
-    def advance(self, return_on_newline=False):
+    def advance(self):
         self.pos += 1
         self.col += 1
-
-        end_of_line = False
 
         if self.pos < len(self.line_buf):
             self.cur_char = self.line_buf[self.pos]
         else:
-            end_of_line = True
-            if return_on_newline:
-                return end_of_line
             # if we've reached the end of the line, fill er up again
             self.fill_buffer()
+
             if self.line_buf:
                 self.pos = 0
                 self.line += 1
@@ -58,15 +54,26 @@ class Lexer(object):
             else:
                 # no more characters
                 self.cur_char = ''
-        return end_of_line
 
     def get_indent(self):
         indent = 0
 
-        end_of_line = False
-        while self.cur_char.isspace() and self.cur_char and not end_of_line:
+        while self.cur_char.isspace():
             indent += 1
-            end_of_line = self.advance(True)
+            self.pos += 1
+            self.col += 1
+
+            if self.pos < len(self.line_buf):
+                self.cur_char = self.line_buf[self.pos]
+            else:
+                break
+
+        # If the current character is a non-space and we read an indent
+        # level, that means we over-read the indent and need to back up
+        # one space
+        if not self.cur_char.isspace() and self.cur_char and indent > 0:
+            self.pos -= 1
+            self.col -= 1
 
         token = None
 
@@ -79,6 +86,7 @@ class Lexer(object):
                 self.col -= 1
                 token = Token(TokenType.DEDENT, size, self.line, self.col)
                 self.advance()
+
             elif indent > last_indent:
                 self.indent_stack.append(indent)
                 size = indent - last_indent
@@ -104,13 +112,14 @@ class Lexer(object):
                 if indent is not None:
                     return indent
 
-            while self.cur_char.isspace():
+            while self.cur_char.isspace() and self.cur_char:
                 self.advance()
 
             if self.cur_char.isdigit() or self.cur_char == '.':
                 num_str = ''
 
-                while self.cur_char.isdigit() or self.cur_char == '.':
+                while ((self.cur_char.isdigit() or self.cur_char == '.') and
+                       self.cur_char):
                     num_str += self.cur_char
                     self.advance()
 
@@ -119,10 +128,13 @@ class Lexer(object):
             elif self.cur_char == '#':
                 self.advance()
 
+                comment_str = ''
+
                 while self.cur_char and self.cur_char not in set(['\n', '\r']):
+                    comment_str += self.cur_char
                     self.advance()
 
-                return self.next_token()
+                return Token(TokenType.COMMENT, comment_str, cur_line, cur_col)
 
             elif self.cur_char in Token.keyword_map:
                 last = self.cur_char
@@ -133,7 +145,9 @@ class Lexer(object):
             elif not self.cur_char.isspace():
                 id_str = ''
 
-                while not self.cur_char.isspace() and not self.cur_char in Token.keyword_map:
+                while (not self.cur_char.isspace() and
+                       not self.cur_char in Token.keyword_map and
+                       self.cur_char):
                     id_str += self.cur_char
                     self.advance()
 
