@@ -102,6 +102,82 @@ class Lexer(object):
 
         return token
 
+    def handle_number(self, cur_line, cur_col):
+        num_str = ''
+
+        while ((self.cur_char.isdigit() or self.cur_char == '.') and
+               self.cur_char):
+            num_str += self.cur_char
+            self.advance()
+
+        return Token(TokenType.NUMBER, num_str, cur_line, cur_col)
+
+    def skip_whitespace(self):
+        while self.cur_char.isspace() and self.cur_char:
+            self.advance()
+
+    def handle_comments(self, cur_line, cur_col):
+        self.advance()
+
+        comment_str = ''
+
+        while self.cur_char and self.cur_char not in set(['\n', '\r']):
+            comment_str += self.cur_char
+            self.advance()
+
+        return Token(TokenType.COMMENT, comment_str, cur_line, cur_col)
+
+    def handle_single_keyword(self, cur_line, cur_col):
+        last = self.cur_char
+        self.advance()
+        return Token(Token.keyword_map[last], last,
+                     cur_line, cur_col)
+
+    def handle_ident(self, cur_line, cur_col):
+        id_str = ''
+
+        while (not self.cur_char.isspace() and
+               not self.cur_char in Token.keyword_map and
+               self.cur_char):
+            id_str += self.cur_char
+            self.advance()
+
+        if self.cur_char in Token.keyword_map and not id_str:
+            token = Token(Token.keyword_map[self.cur_char],
+                          self.cur_char,
+                          cur_line, cur_col)
+            self.advance()
+            return token
+
+        if id_str in Token.keyword_map:
+            return Token(Token.keyword_map[id_str], id_str,
+                         cur_line, cur_col)
+        else:
+            return Token(TokenType.IDENT, id_str, cur_line, cur_col)
+
+    def get_trailing_dedent(self, cur_line):
+        # Extra indents that have not been taken care of (ie: at the
+        # end of an indented file)
+        indent = self.indent_stack.pop()
+
+        content = indent
+
+        if self.indent_stack:
+            previous_indent = self.indent_stack[-1]
+            content = indent - previous_indent
+
+        return Token(TokenType.DEDENT, content, cur_line+1, 1)
+
+    def get_token(self, cur_col, cur_line):
+        if self.cur_char.isdigit() or self.cur_char == '.':
+            return self.handle_number(cur_line, cur_col)
+        elif self.cur_char == '#':
+            return self.handle_comments(cur_line, cur_col)
+        elif self.cur_char in Token.keyword_map:
+            return self.handle_single_keyword(cur_line, cur_col)
+        elif not self.cur_char.isspace():
+            return self.handle_ident(cur_line, cur_col)
+
     def next_token(self):
         cur_col = self.col
         cur_line = self.line
@@ -112,71 +188,15 @@ class Lexer(object):
                 if indent is not None:
                     return indent
 
-            while self.cur_char.isspace() and self.cur_char:
-                self.advance()
+            self.skip_whitespace()
 
-            if self.cur_char.isdigit() or self.cur_char == '.':
-                num_str = ''
+            token = self.get_token(cur_line, cur_col)
 
-                while ((self.cur_char.isdigit() or self.cur_char == '.') and
-                       self.cur_char):
-                    num_str += self.cur_char
-                    self.advance()
-
-                return Token(TokenType.NUMBER, num_str, cur_line, cur_col)
-
-            elif self.cur_char == '#':
-                self.advance()
-
-                comment_str = ''
-
-                while self.cur_char and self.cur_char not in set(['\n', '\r']):
-                    comment_str += self.cur_char
-                    self.advance()
-
-                return Token(TokenType.COMMENT, comment_str, cur_line, cur_col)
-
-            elif self.cur_char in Token.keyword_map:
-                last = self.cur_char
-                self.advance()
-                return Token(Token.keyword_map[last], last,
-                             cur_line, cur_col)
-
-            elif not self.cur_char.isspace():
-                id_str = ''
-
-                while (not self.cur_char.isspace() and
-                       not self.cur_char in Token.keyword_map and
-                       self.cur_char):
-                    id_str += self.cur_char
-                    self.advance()
-
-                if self.cur_char in Token.keyword_map and not id_str:
-                    token = Token(Token.keyword_map[self.cur_char],
-                                  self.cur_char,
-                                  cur_line, cur_col)
-                    self.advance()
-                    return token
-
-                if id_str in Token.keyword_map:
-                    return Token(Token.keyword_map[id_str], id_str,
-                                 cur_line, cur_col)
-                else:
-                    return Token(TokenType.IDENT, id_str, cur_line, cur_col)
-
+            if token:
+                return token
 
         if self.indent_stack:
-            # Extra indents that have not been taken care of (ie: at the
-            # end of an indented file)
-            indent = self.indent_stack.pop()
-
-            content = indent
-
-            if self.indent_stack:
-                previous_indent = self.indent_stack[-1]
-                content = indent - previous_indent
-
-            return Token(TokenType.DEDENT, content, cur_line+1, 1)
+            return self.get_trailing_dedent(cur_line)
 
         return Token(TokenType.EOF, '', cur_line+1, 1)
 
